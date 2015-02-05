@@ -33,11 +33,12 @@ function civicrm_api3_pdf_create($params) {
   }
   $contactIds = explode(",", $params['contact_id']);
 
-  // Compatibility with CiviCRM < 4.5
-  if($version < 4.5)
+  // Compatibility with CiviCRM > 4.3
+  if($version > 4.3) {
     $messageTemplates = new CRM_Core_DAO_MessageTemplate();
-  else
+  } else {
     $messageTemplates = new CRM_Core_DAO_MessageTemplates();
+  }
 
   $messageTemplates->id = $params['template_id'];
   if (!$messageTemplates->find(TRUE)) {

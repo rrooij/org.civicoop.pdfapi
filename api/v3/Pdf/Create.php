@@ -26,8 +26,14 @@ function _civicrm_api3_pdf_create_spec(&$spec) {
 function civicrm_api3_pdf_create($params) {
   $domain     = CRM_Core_BAO_Domain::getDomain();
   $contactId = $params['contact_id'];
+  $version = CRM_Core_BAO_Domain::version();
 
-  $messageTemplates = new CRM_Core_DAO_MessageTemplates();
+  // Compatibility with CiviCRM < 4.5
+  if($version < 4.5)
+    $messageTemplates = new CRM_Core_DAO_MessageTemplate();
+  else
+    $messageTemplates = new CRM_Core_DAO_MessageTemplates();
+
   $messageTemplates->id = $params['template_id'];
   if (!$messageTemplates->find(TRUE)) {
     throw new API_Exception('Could not find template with ID: ' . $params['template_id']);
@@ -95,12 +101,12 @@ function civicrm_api3_pdf_create($params) {
   if ($contact['do_not_mail'] || CRM_Utils_Array::value('is_deceased', $contact) || $contact['on_hold']) {
     throw new API_Exception('Suppressed creating pdf letter for: '.$contact['display_name']);
   }
-  
+
   // call token hook
   $hookTokens = array();
   CRM_Utils_Hook::tokens($hookTokens);
   $categories = array_keys($hookTokens);
-  
+
   CRM_Utils_Token::replaceGreetingTokens($html_message, NULL, $contact['contact_id']);
   $html_message = CRM_Utils_Token::replaceDomainTokens($html_message, $domain, true, $tokens, true);
   $html_message = CRM_Utils_Token::replaceContactTokens($html_message, $contact, false, $tokens, false, true);
@@ -112,13 +118,13 @@ function civicrm_api3_pdf_create($params) {
     $smarty->assign_by_ref('contact', $contact);
     $html_message = $smarty->fetch("string:$html_message");
   }
-  
+
   $fileName = $contact['sort_name'].' - Letter.pdf';
   $pdf = CRM_Utils_PDF_Utils::html2pdf($html_message, $fileName, TRUE, $messageTemplates->pdf_format_id);
   $tmpFileName = CRM_Utils_File::tempnam();
   file_put_contents($tmpFileName, $pdf);
   unset($pdf); //we don't need the temp file in memory
-  
+
   //create activity
   $activityTypeID = CRM_Core_OptionGroup::getValue('activity_type',
     'Print PDF Letter',
@@ -131,12 +137,27 @@ function civicrm_api3_pdf_create($params) {
     'details' => $html_message,
   );
   $activity = CRM_Activity_BAO_Activity::create($activityParams);
-  $activityTargetParams = array(
-    'activity_id' => $activity->id,
-    'target_contact_id' => $contactId,
-  );
-  CRM_Activity_BAO_Activity::createActivityTarget($activityTargetParams);
-  
+
+  // Compatibility with CiviCRM < 4.5
+  if($version < 4.5){
+    $activityContacts = CRM_Core_OptionGroup::values('activity_contacts', FALSE, FALSE, FALSE, NULL, 'name');
+    $targetID = CRM_Utils_Array::key('Activity Targets', $activityContacts);
+
+    $activityTargetParams = array(
+      'activity_id' => $activity->id,
+      'contact_id' => $contactId,
+      'record_type_id' => $targetID
+    );
+    CRM_Activity_BAO_ActivityContact::create($activityTargetParams);
+  }
+  else{
+    $activityTargetParams = array(
+      'activity_id' => $activity->id,
+      'target_contact_id' => $contactId,
+    );
+    CRM_Activity_BAO_Activity::createActivityTarget($activityTargetParams);
+  }
+
   //send PDF to e-mail address
   $from = CRM_Core_BAO_Domain::getNameAndEmail();
   $from = "$from[0] <$from[1]>";
@@ -161,7 +182,7 @@ function civicrm_api3_pdf_create($params) {
   if (!$result) {
     throw new API_Exception('Error sending e-mail to '.$params['to_email']);
   }
-  
+
 
   $returnValues = array();
   return civicrm_api3_create_success($returnValues, $params, 'Pdf', 'Create');

@@ -46,8 +46,29 @@ function civicrm_api3_pdf_create($params) {
   }
 
   // Ooptional pdf_format_id, if not defaul 0
-  $messageTemplates->pdf_format_id = CRM_Utils_Array::value('pdf_format_id', $params, 0);
+  if (isset($params['pdf_format_id'])) {
+    $messageTemplates->pdf_format_id = CRM_Utils_Array::value('pdf_format_id', $params, 0);
+  }
   $html_template = _civicrm_api3_pdf_formatMessage($messageTemplates);
+
+  $tokens = CRM_Utils_Token::getTokens($html_template);
+
+  // get replacement text for these tokens
+  $returnProperties = array(
+      'sort_name' => 1,
+      'email' => 1,
+      'address' => 1,
+      'do_not_email' => 1,
+      'is_deceased' => 1,
+      'on_hold' => 1,
+      'display_name' => 1,
+  );
+  if (isset($messageToken['contact'])) {
+    foreach ($messageToken['contact'] as $key => $value) {
+      $returnProperties[$value] = 1;
+    }
+  }
+
 
   foreach($contactIds as $contactId){
     $html_message = $html_template;
@@ -93,8 +114,8 @@ function civicrm_api3_pdf_create($params) {
     );
     $activity = CRM_Activity_BAO_Activity::create($activityParams);
 
-    // Compatibility with CiviCRM < 4.5
-    if($version < 4.5){
+    // Compatibility with CiviCRM >= 4.4
+    if($version >= 4.4){
       $activityContacts = CRM_Core_OptionGroup::values('activity_contacts', FALSE, FALSE, FALSE, NULL, 'name');
       $targetID = CRM_Utils_Array::key('Activity Targets', $activityContacts);
 
@@ -191,24 +212,6 @@ function _civicrm_api3_pdf_formatMessage($messageTemplates){
     $m = implode($newLineOperators['br']['oper'], $messages);
   }
   $html_message = implode($newLineOperators['p']['oper'], $htmlMsg);
-
-  $tokens = CRM_Utils_Token::getTokens($html_message);
-
-  // get replacement text for these tokens
-  $returnProperties = array(
-        'sort_name' => 1,
-        'email' => 1,
-        'address' => 1,
-        'do_not_email' => 1,
-        'is_deceased' => 1,
-        'on_hold' => 1,
-        'display_name' => 1,
-      );
-  if (isset($messageToken['contact'])) {
-    foreach ($messageToken['contact'] as $key => $value) {
-      $returnProperties[$value] = 1;
-    }
-  }
 
   return $html_message;
 }

@@ -29,7 +29,7 @@ function civicrm_api3_pdf_create($params) {
   $html    = array();
 
   if (!preg_match('/[0-9]+(,[0-9]+)*/i', $params['contact_id'])) {
-    throw new API_Exception('Parameter contact_id must be a unique id or a list of ids separeted by comma');
+    throw new API_Exception('Parameter contact_id must be a unique id or a list of ids separated by comma');
   }
   $contactIds = explode(",", $params['contact_id']);
 

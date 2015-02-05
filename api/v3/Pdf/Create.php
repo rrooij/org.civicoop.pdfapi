@@ -43,6 +43,9 @@ function civicrm_api3_pdf_create($params) {
   if (!$messageTemplates->find(TRUE)) {
     throw new API_Exception('Could not find template with ID: ' . $params['template_id']);
   }
+
+  // Ooptional pdf_format_id, if not defaul 0
+  $messageTemplates->pdf_format_id = CRM_Utils_Array::value('pdf_format_id', $params, 0);
   $html_template = _civicrm_api3_pdf_formatMessage($messageTemplates);
 
   foreach($contactIds as $contactId){

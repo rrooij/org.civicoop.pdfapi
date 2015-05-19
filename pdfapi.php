@@ -106,3 +106,23 @@ function pdfapi_civicrm_caseTypes(&$caseTypes) {
 function pdfapi_civicrm_alterSettingsFolders(&$metaDataFolders = NULL) {
   _pdfapi_civix_civicrm_alterSettingsFolders($metaDataFolders);
 }
+
+/**
+ * Function for CiviRules, check if CiviRules is installed
+ *
+ * @return bool
+ */
+function _pdfapi_is_civirules_installed() {
+  $installed = FALSE;
+  try {
+    $extensions = civicrm_api3('Extension', 'get');
+    foreach($extensions['values'] as $ext) {
+      if ($ext['key'] == 'org.civicoop.civirules' &&$ext['status'] == 'installed') {
+        $installed = TRUE;
+      }
+    }
+  } catch (Exception $e) {
+    $installed = FALSE;
+  }
+  return $installed;
+}

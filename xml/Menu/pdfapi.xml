@@ -1,0 +1,9 @@
+<?xml version="1.0"?>
+<menu>
+  <item>
+    <path>civicrm/civirules/actions/pdfapi</path>
+    <page_callback>CRM_Pdfapi_Form_CivirulesAction</page_callback>
+    <title>CivirulesAction</title>
+    <access_arguments>access CiviCRM</access_arguments>
+  </item>
+</menu>

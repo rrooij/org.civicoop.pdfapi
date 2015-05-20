@@ -1,5 +1,5 @@
 <h3>{$ruleActionHeader}</h3>
-<div class="crm-block crm-form-block crm-civirule-rule_action-block-email-send">
+<div class="crm-block crm-form-block crm-civirule-rule_action-block-pdf-create">
   <div class="crm-section">
     <div class="label">{$form.to_email.label}</div>
     <div class="content">{$form.to_email.html}</div>

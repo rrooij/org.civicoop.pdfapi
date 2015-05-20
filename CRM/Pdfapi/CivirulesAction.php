@@ -1,4 +1,10 @@
 <?php
+/**
+ * Class for CiviRule Action pdf create
+ *
+ * @author Erik Hommel (CiviCooP) <erik.hommel@civicoop.org>
+ * @license http://www.gnu.org/licenses/agpl-3.0.html
+ */
 
 class CRM_Pdfapi_CivirulesAction extends CRM_CivirulesActions_Generic_Api {
 

@@ -74,10 +74,21 @@ function civicrm_api3_pdf_create($params) {
     $html_message = $html_template;
     list($details) = CRM_Utils_Token::getTokenDetails(array($contactId), $returnProperties, false, false, null, $tokens);
     $contact = reset( $details );
-    if ($contact['do_not_mail'] || CRM_Utils_Array::value('is_deceased', $contact) || $contact['on_hold']) {
-      // Throw exception only if we are printing for 1 contact, if not skip it
+    if (isset($contact['do_not_mail']) && $contact['do_not_mail'] == TRUE) {
       if(count($contactIds) == 1)
-        throw new API_Exception('Suppressed creating pdf letter for: '.$contact['display_name']);
+        throw new API_Exception('Suppressed creating pdf letter for: '.$contact['display_name'].' because DO NOT MAIL is set');
+      else
+        continue;
+    }
+    if (isset($contact['is_deceased']) && $contact['is_deceased'] == TRUE) {
+      if(count($contactIds) == 1)
+        throw new API_Exception('Suppressed creating pdf letter for: '.$contact['display_name'].' because contact is deceased');
+      else
+        continue;
+    }
+    if (isset($contact['on_hold']) && $contact['on_hold'] == TRUE) {
+      if(count($contactIds) == 1)
+        throw new API_Exception('Suppressed creating pdf letter for: '.$contact['display_name'].' because contact is on hold');
       else
         continue;
     }

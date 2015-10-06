@@ -84,7 +84,7 @@ class CRM_Pdfapi_Form_CivirulesAction extends CRM_Core_Form {
     $defaultValues = array();
     $defaultValues['rule_action_id'] = $this->ruleActionId;
     if (!empty($this->ruleAction->action_params)) {
-      $data = unserialize($this->ruleCondition->action_params);
+      $data = unserialize($this->ruleAction->action_params);
     }
     if (!empty($data['to_email'])) {
       $defaultValues['to_email'] = $data['to_email'];

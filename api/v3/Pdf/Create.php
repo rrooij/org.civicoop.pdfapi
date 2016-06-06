@@ -49,6 +49,7 @@ function civicrm_api3_pdf_create($params) {
   if (isset($params['pdf_format_id'])) {
     $messageTemplates->pdf_format_id = CRM_Utils_Array::value('pdf_format_id', $params, 0);
   }
+  $subject = $messageTemplates->msg_subject;
   $html_template = _civicrm_api3_pdf_formatMessage($messageTemplates);
 
   $tokens = CRM_Utils_Token::getTokens($html_template);
@@ -122,6 +123,7 @@ function civicrm_api3_pdf_create($params) {
       'activity_type_id' => $activityTypeID,
       'activity_date_time' => date('YmdHis'),
       'details' => $html_message,
+      'subject' => $subject,
     );
     $activity = CRM_Activity_BAO_Activity::create($activityParams);
 

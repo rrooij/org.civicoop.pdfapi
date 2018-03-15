@@ -53,16 +53,18 @@ function civicrm_api3_pdf_create($params) {
   $html_template = _civicrm_api3_pdf_formatMessage($messageTemplates);
 
   $tokens = CRM_Utils_Token::getTokens($html_template);
-  
-  if (isset($params['template_email_id']) && is_numeric($params['template_email_id']) && $params['template_email_id'] > 0) {
+
+  // Optional template_email_id, if not default 0
+  $template_email_id = CRM_Utils_Array::value('template_email_id', $params, 0);
+  if ($template_email_id) {
     if($version >= 4.4) {
       $messageTemplatesEmail = new CRM_Core_DAO_MessageTemplate();
     } else {
       $messageTemplatesEmail = new CRM_Core_DAO_MessageTemplates();
     }
-    $messageTemplatesEmail->id = $params['template_email_id'];
+    $messageTemplatesEmail->id = $template_email_id;
     if (!$messageTemplatesEmail->find(TRUE)) {
-      throw new API_Exception('Could not find template with ID: ' . $params['template_email_id']);
+      throw new API_Exception('Could not find template with ID: ' . $template_email_id);
     }
     $html_message_email = $messageTemplatesEmail->msg_html;
     $tokens_email = CRM_Utils_Token::getTokens($html_message_email);
@@ -126,9 +128,8 @@ function civicrm_api3_pdf_create($params) {
     }
 
     $html[] = $html_message;
-    
-    if (isset($params['template_email_id']) && is_numeric($params['template_email_id']) && $params['template_email_id'] > 0) {
-      
+
+    if ($template_email_id) {
       CRM_Utils_Token::replaceGreetingTokens($html_message_email, NULL, $contact['contact_id']);
       $html_message_email = CRM_Utils_Token::replaceDomainTokens($html_message_email, $domain, true, $tokens_email, true);
       $html_message_email = CRM_Utils_Token::replaceContactTokens($html_message_email, $contact, false, $tokens_email, false, true);
@@ -144,8 +145,6 @@ function civicrm_api3_pdf_create($params) {
     else {
       $html_message_email = "CiviCRM has generated a PDF letter";
     }
-    
-    
 
     //create activity
     $activityTypeID = CRM_Core_OptionGroup::getValue('activity_type',

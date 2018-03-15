@@ -112,6 +112,37 @@ function civicrm_api3_pdf_create($params) {
     }
 
     $html[] = $html_message;
+    
+    if (isset($params['template_email_id']) && is_numeric($params['template_email_id']) && $params['template_email_id'] > 0) {
+      if($version >= 4.4) {
+        $messageTemplatesEmail = new CRM_Core_DAO_MessageTemplate();
+      } else {
+        $messageTemplatesEmail = new CRM_Core_DAO_MessageTemplates();
+      }
+      $messageTemplatesEmail->id = $params['template_email_id'];
+      if (!$messageTemplatesEmail->find(TRUE)) {
+        throw new API_Exception('Could not find template with ID: ' . $params['template_email_id']);
+      }
+      $html_message_email = $messageTemplatesEmail->msg_html;
+      CRM_Utils_Token::replaceGreetingTokens($html_message_email, NULL, $contact['contact_id']);
+      $html_message_email = CRM_Utils_Token::replaceDomainTokens($html_message_email, $domain, true, $tokens, true);
+      $html_message_email = CRM_Utils_Token::replaceContactTokens($html_message_email, $contact, false, $tokens, false, true);
+      $html_message_email = CRM_Utils_Token::replaceComponentTokens($html_message_email, $contact, $tokens, true);
+      $html_message_email = CRM_Utils_Token::replaceHookTokens($html_message_email, $contact , $categories, true);
+      if (defined('CIVICRM_MAIL_SMARTY') && CIVICRM_MAIL_SMARTY) {
+        $smarty = CRM_Core_Smarty::singleton();
+        // also add the contact tokens to the template
+        $smarty->assign_by_ref('contact', $contact);
+        $html_message_email = $smarty->fetch("string:$html_message_email");
+      }
+      
+      
+    }
+    else {
+      $html_message_email = "CiviCRM has generated a PDF letter";
+    }
+    
+    
 
     //create activity
     $activityTypeID = CRM_Core_OptionGroup::getValue('activity_type',
@@ -164,7 +195,7 @@ function civicrm_api3_pdf_create($params) {
     'toName' => $from[0],
     'toEmail' => $params['to_email'],
     'subject' => 'PDF Letter from Civicrm - ' . $messageTemplates->msg_title,
-    'text' => "CiviCRM has generated a PDF letter",
+    'html' => $html_message_email,
     'attachments' => array(
         array(
             'fullPath' => $tmpFileName,

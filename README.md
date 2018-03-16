@@ -9,7 +9,3 @@ Parameters for the api are specified below:
 - to_email: e-mail address where the pdf file is send to
 - pdf_format_id: (optional) ID of the PDF format, is not especified the default PDF format is used
 - template_email_id: (optional) ID of the message template which will be used to generate the email body.
-
-*It is not possible to specify your own message through the API.*
-
-

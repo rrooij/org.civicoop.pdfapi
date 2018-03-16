@@ -54,6 +54,22 @@ function civicrm_api3_pdf_create($params) {
 
   $tokens = CRM_Utils_Token::getTokens($html_template);
 
+  // Optional template_email_id, if not default 0
+  $template_email_id = CRM_Utils_Array::value('template_email_id', $params, 0);
+  if ($template_email_id) {
+    if($version >= 4.4) {
+      $messageTemplatesEmail = new CRM_Core_DAO_MessageTemplate();
+    } else {
+      $messageTemplatesEmail = new CRM_Core_DAO_MessageTemplates();
+    }
+    $messageTemplatesEmail->id = $template_email_id;
+    if (!$messageTemplatesEmail->find(TRUE)) {
+      throw new API_Exception('Could not find template with ID: ' . $template_email_id);
+    }
+    $html_message_email = $messageTemplatesEmail->msg_html;
+    $tokens_email = CRM_Utils_Token::getTokens($html_message_email);
+  }
+
   // get replacement text for these tokens
   $returnProperties = array(
       'sort_name' => 1,
@@ -113,6 +129,23 @@ function civicrm_api3_pdf_create($params) {
 
     $html[] = $html_message;
 
+    if ($template_email_id) {
+      CRM_Utils_Token::replaceGreetingTokens($html_message_email, NULL, $contact['contact_id']);
+      $html_message_email = CRM_Utils_Token::replaceDomainTokens($html_message_email, $domain, true, $tokens_email, true);
+      $html_message_email = CRM_Utils_Token::replaceContactTokens($html_message_email, $contact, false, $tokens_email, false, true);
+      $html_message_email = CRM_Utils_Token::replaceComponentTokens($html_message_email, $contact, $tokens_email, true);
+      $html_message_email = CRM_Utils_Token::replaceHookTokens($html_message_email, $contact , $categories, true);
+      if (defined('CIVICRM_MAIL_SMARTY') && CIVICRM_MAIL_SMARTY) {
+        $smarty = CRM_Core_Smarty::singleton();
+        // also add the contact tokens to the template
+        $smarty->assign_by_ref('contact', $contact);
+        $html_message_email = $smarty->fetch("string:$html_message_email");
+      }
+    }
+    else {
+      $html_message_email = "CiviCRM has generated a PDF letter";
+    }
+
     //create activity
     $activityTypeID = CRM_Core_OptionGroup::getValue('activity_type',
       'Print PDF Letter',
@@ -164,7 +197,7 @@ function civicrm_api3_pdf_create($params) {
     'toName' => $from[0],
     'toEmail' => $params['to_email'],
     'subject' => 'PDF Letter from Civicrm - ' . $messageTemplates->msg_title,
-    'text' => "CiviCRM has generated a PDF letter",
+    'html' => $html_message_email,
     'attachments' => array(
         array(
             'fullPath' => $tmpFileName,

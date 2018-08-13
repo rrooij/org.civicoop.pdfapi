@@ -56,6 +56,9 @@ function civicrm_api3_pdf_create($params) {
 
   // Optional template_email_id, if not default 0
   $template_email_id = CRM_Utils_Array::value('template_email_id', $params, 0);
+  // Optional argument: use email subject from email template
+  $template_email_use_subject = CRM_Utils_Array::value('template_email_use_subject', $params, 0);
+
   if ($template_email_id) {
     if($version >= 4.4) {
       $messageTemplatesEmail = new CRM_Core_DAO_MessageTemplate();
@@ -67,6 +70,7 @@ function civicrm_api3_pdf_create($params) {
       throw new API_Exception('Could not find template with ID: ' . $template_email_id);
     }
     $html_message_email = $messageTemplatesEmail->msg_html;
+    $email_subject = $messageTemplatesEmail->msg_subject;
     $tokens_email = CRM_Utils_Token::getTokens($html_message_email);
   }
 
@@ -146,6 +150,16 @@ function civicrm_api3_pdf_create($params) {
       $html_message_email = "CiviCRM has generated a PDF letter";
     }
 
+    if ($template_email_use_subject && $template_email_id) {
+        $email_subject = CRM_Utils_Token::replaceDomainTokens($email_subject, $domain, true, $tokens_email, true);
+        $email_subject = CRM_Utils_Token::replaceContactTokens($email_subject, $contact, false, $tokens_email, false, true);
+        $email_subject = CRM_Utils_Token::replaceComponentTokens($email_subject, $contact, $tokens_email, true);
+        $email_subject = CRM_Utils_Token::replaceHookTokens($email_subject, $contact , $categories, true);
+    }
+    else {
+        $email_subject = 'PDF Letter from Civicrm - ' . $messageTemplates->msg_title;
+    }
+
     //create activity
     $activityTypeID = CRM_Core_OptionGroup::getValue('activity_type',
       'Print PDF Letter',
@@ -196,7 +210,7 @@ function civicrm_api3_pdf_create($params) {
     'from' => $from,
     'toName' => $from[0],
     'toEmail' => $params['to_email'],
-    'subject' => 'PDF Letter from Civicrm - ' . $messageTemplates->msg_title,
+    'subject' => $email_subject,
     'html' => $html_message_email,
     'attachments' => array(
         array(

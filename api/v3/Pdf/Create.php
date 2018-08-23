@@ -120,12 +120,18 @@ function civicrm_api3_pdf_create($params) {
 
   $imgTags = array();
   $imgRegex = '/<img([\w\W]+?)/>/';
+  $removeTags = array(
+      '@<head[^>]*?>.*?</head>@siu',
+      '@<script[^>]*?>.*?</script>@siu',
+      '@<body>@siu',
+      '@</body>@siu',
+      '@<html[^>]*?>@siu',
+      '@</html>@siu',
+      '@<!DOCTYPE[^>]*?>@siu',
+    );
+  $htmlElementsInstead = array('', '', '', '', '', '');
+  $html_template = preg_replace($htmlElementstoStrip, $htmlElementsInstead, $html_template);
   // Also capure the offset of the img tags so that we can insert them later
-  preg_match($imgRegex, $html_template, $matches, PREG_OFFSET_CAPTURE);
-  // Temporarily delete all img tags and put them back later
-  if (count($imgTags) !== 0) {
-    preg_replace($imgRegex, '');
-  }
 
   list($details) = CRM_Utils_Token::getTokenDetails($contactIds, $returnProperties, false, false, null, $tokens);
   // call token hook
@@ -156,20 +162,12 @@ function civicrm_api3_pdf_create($params) {
     CRM_Utils_Token::replaceGreetingTokens($html_message, NULL, $contact['contact_id']);
     $html_message = CRM_Utils_Token::replaceContactTokens($html_message, $contact, false, $tokens, false, true);
     $html_message = CRM_Utils_Token::replaceHookTokens($html_message, $contact , $categories, true);
-    // Put all img tags back in the string
-    foreach($imgTags as $imgTag) {
-      substr_replace($html_message, $imgTag[0], $imgTag[1], 0);
-    }
     // Add new page after every contact
     $html_message .= '<div style="page-break-after: always"></div>';
     $html .= $html_message;
   }
   $finalHtml = _civicrm_api3_pdf_generate_html($html, $messageTemplates->pdf_format_id);
-  // Write HTML to temporary file
-  $htmlFile = fopen("/tmp/{$messageTemplates->id}.html", 'w');
-  fwrite($htmlFile, $finalHtml);
-  fclose($htmlFile);
-  return civicrm_api3_create_success(['html' => 'ok'], $params, 'Pdf', 'Create');
+  return civicrm_api3_create_success(['html' => $finalHtml], $params, 'Pdf', 'Create');
 }
 
 function _civicrm_api3_pdf_formatMessage($messageTemplates){

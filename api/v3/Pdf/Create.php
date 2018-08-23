@@ -120,7 +120,7 @@ function civicrm_api3_pdf_create($params) {
 
   $imgTags = array();
   $imgRegex = '/<img([\w\W]+?)/>/';
-  // Also capure the offset of the img tags so that we can insret them later
+  // Also capure the offset of the img tags so that we can insert them later
   preg_match($imgRegex, $html_template, $matches, PREG_OFFSET_CAPTURE);
   // Temporarily delete all img tags and put them back later
   if (count($imgTags) !== 0) {

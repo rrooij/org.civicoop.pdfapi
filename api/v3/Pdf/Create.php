@@ -1,5 +1,6 @@
 <?php
 
+ini_set('max_execution_time', 20000);
 /**
  * Pdf.Create API specification (optional)
  * This is used for documentation and validation.
@@ -14,6 +15,57 @@ function _civicrm_api3_pdf_create_spec(&$spec) {
   $spec['to_email']['api.required'] = 1;
 }
 
+function _civicrm_api3_pdf_generate_html(&$text, $pdfFormat = NULL ) {
+    // Get PDF Page Format
+    $format = CRM_Core_BAO_PdfFormat::getDefaultValues();
+    if (is_array($pdfFormat)) {
+      // PDF Page Format parameters passed in
+      $format = array_merge($format, $pdfFormat);
+    }
+    else {
+      // PDF Page Format ID passed in
+      $format = CRM_Core_BAO_PdfFormat::getById($pdfFormat);
+    }
+    $paperSize = CRM_Core_BAO_PaperSize::getByName($format['paper_size']);
+    $paper_width = CRM_Utils_PDF_Utils::convertMetric($paperSize['width'], $paperSize['metric'], 'pt');
+    $paper_height = CRM_Utils_PDF_Utils::convertMetric($paperSize['height'], $paperSize['metric'], 'pt');
+    // dompdf requires dimensions in points
+    $paper_size = array(0, 0, $paper_width, $paper_height);
+    $orientation = CRM_Core_BAO_PdfFormat::getValue('orientation', $format);
+    $metric = CRM_Core_BAO_PdfFormat::getValue('metric', $format);
+    $t = CRM_Core_BAO_PdfFormat::getValue('margin_top', $format);
+    $r = CRM_Core_BAO_PdfFormat::getValue('margin_right', $format);
+    $b = CRM_Core_BAO_PdfFormat::getValue('margin_bottom', $format);
+    $l = CRM_Core_BAO_PdfFormat::getValue('margin_left', $format);
+    $stationery_path_partial = CRM_Core_BAO_PdfFormat::getValue('stationery', $format);
+    $stationery_path = NULL;
+    if (strlen($stationery_path_partial)) {
+      $doc_root = $_SERVER['DOCUMENT_ROOT'];
+      $stationery_path = $doc_root . "/" . $stationery_path_partial;
+    }
+    $margins = array($metric, $t, $r, $b, $l);
+    $config = CRM_Core_Config::singleton();
+    // Add a special region for the HTML header of PDF files:
+    $pdfHeaderRegion = CRM_Core_Region::instance('export-document-header', FALSE);
+    $htmlHeader = ($pdfHeaderRegion) ? $pdfHeaderRegion->render('', FALSE) : '';
+    $html = "
+<html>
+  <head>
+    <meta http-equiv=\"Content-Type\" content=\"text/html; charset=utf-8\"/>
+    <style>@page { margin: {$t}{$metric} {$r}{$metric} {$b}{$metric} {$l}{$metric}; }</style>
+    <style type=\"text/css\">@import url({$config->userFrameworkResourceURL}css/print.css);</style>
+    {$htmlHeader}
+  </head>
+  <body>
+    <div id=\"crm-container\">\n";
+    $html .= $text;
+    $html .= "
+    </div>
+  </body>
+</html>";
+    return $html;
+}
+
 /**
  * Pdf.Create API
  *
@@ -24,9 +76,8 @@ function _civicrm_api3_pdf_create_spec(&$spec) {
  * @throws API_Exception
  */
 function civicrm_api3_pdf_create($params) {
-  $domain  = CRM_Core_BAO_Domain::getDomain();
   $version = CRM_Core_BAO_Domain::version();
-  $html    = array();
+  $html    = '';
 
   if (!preg_match('/[0-9]+(,[0-9]+)*/i', $params['contact_id'])) {
     throw new API_Exception('Parameter contact_id must be a unique id or a list of ids separated by comma');
@@ -44,36 +95,13 @@ function civicrm_api3_pdf_create($params) {
   if (!$messageTemplates->find(TRUE)) {
     throw new API_Exception('Could not find template with ID: ' . $params['template_id']);
   }
-
   // Optional pdf_format_id, if not default 0
   if (isset($params['pdf_format_id'])) {
     $messageTemplates->pdf_format_id = CRM_Utils_Array::value('pdf_format_id', $params, 0);
   }
-  $subject = $messageTemplates->msg_subject;
   $html_template = _civicrm_api3_pdf_formatMessage($messageTemplates);
 
   $tokens = CRM_Utils_Token::getTokens($html_template);
-
-  // Optional template_email_id, if not default 0
-  $template_email_id = CRM_Utils_Array::value('template_email_id', $params, 0);
-  // Optional argument: use email subject from email template
-  $template_email_use_subject = CRM_Utils_Array::value('template_email_use_subject', $params, 0);
-
-  if ($template_email_id) {
-    if($version >= 4.4) {
-      $messageTemplatesEmail = new CRM_Core_DAO_MessageTemplate();
-    } else {
-      $messageTemplatesEmail = new CRM_Core_DAO_MessageTemplates();
-    }
-    $messageTemplatesEmail->id = $template_email_id;
-    if (!$messageTemplatesEmail->find(TRUE)) {
-      throw new API_Exception('Could not find template with ID: ' . $template_email_id);
-    }
-    $html_message_email = $messageTemplatesEmail->msg_html;
-    $email_subject = $messageTemplatesEmail->msg_subject;
-    $tokens_email = CRM_Utils_Token::getTokens($html_message_email);
-  }
-
   // get replacement text for these tokens
   $returnProperties = array(
       'sort_name' => 1,
@@ -90,11 +118,23 @@ function civicrm_api3_pdf_create($params) {
     }
   }
 
+  $imgTags = array();
+  $imgRegex = '/<img([\w\W]+?)/>/';
+  // Also capure the offset of the img tags so that we can insret them later
+  preg_match($imgRegex, $html_template, $matches, PREG_OFFSET_CAPTURE);
+  // Temporarily delete all img tags and put them back later
+  if (count($imgTags) !== 0) {
+    preg_replace($imgRegex, '');
+  }
 
+  list($details) = CRM_Utils_Token::getTokenDetails($contactIds, $returnProperties, false, false, null, $tokens);
+  // call token hook
+  $hookTokens = array();
+  CRM_Utils_Hook::tokens($hookTokens);
+  $categories = array_keys($hookTokens);
   foreach($contactIds as $contactId){
     $html_message = $html_template;
-    list($details) = CRM_Utils_Token::getTokenDetails(array($contactId), $returnProperties, false, false, null, $tokens);
-    $contact = reset( $details );
+    $contact = $details[$contactId];
     if (isset($contact['do_not_mail']) && $contact['do_not_mail'] == TRUE) {
       if(count($contactIds) == 1)
         throw new API_Exception('Suppressed creating pdf letter for: '.$contact['display_name'].' because DO NOT MAIL is set');
@@ -113,31 +153,23 @@ function civicrm_api3_pdf_create($params) {
       else
         continue;
     }
-
-    // call token hook
-    $hookTokens = array();
-    CRM_Utils_Hook::tokens($hookTokens);
-    $categories = array_keys($hookTokens);
-
     CRM_Utils_Token::replaceGreetingTokens($html_message, NULL, $contact['contact_id']);
-    $html_message = CRM_Utils_Token::replaceDomainTokens($html_message, $domain, true, $tokens, true);
     $html_message = CRM_Utils_Token::replaceContactTokens($html_message, $contact, false, $tokens, false, true);
-    $html_message = CRM_Utils_Token::replaceComponentTokens($html_message, $contact, $tokens, true);
     $html_message = CRM_Utils_Token::replaceHookTokens($html_message, $contact , $categories, true);
-    if (defined('CIVICRM_MAIL_SMARTY') && CIVICRM_MAIL_SMARTY) {
-      $smarty = CRM_Core_Smarty::singleton();
-      // also add the contact tokens to the template
-      $smarty->assign_by_ref('contact', $contact);
-      $html_message = $smarty->fetch("string:$html_message");
+    // Put all img tags back in the string
+    foreach($imgTags as $imgTag) {
+      substr_replace($html_message, $imgTag[0], $imgTag[1], 0);
     }
-
-    $html[] = $html_message;
+    // Add new page after every contact
+    $html_message .= '<div style="page-break-after: always"></div>';
+    $html .= $html_message;
   }
-
-  $fileName = CRM_Utils_String::munge($messageTemplates->msg_title) . '.pdf';
-  $pdf = CRM_Utils_PDF_Utils::html2pdf($html, $fileName, false, $messageTemplates->pdf_format_id);
-  file_put_contents('/tmp/test.pdf', $pdf);
-  echo $pdf;
+  $finalHtml = _civicrm_api3_pdf_generate_html($html, $messageTemplates->pdf_format_id);
+  // Write HTML to temporary file
+  $htmlFile = fopen("/tmp/{$messageTemplates->id}.html", 'w');
+  fwrite($htmlFile, $finalHtml);
+  fclose($htmlFile);
+  return civicrm_api3_create_success(['html' => 'ok'], $params, 'Pdf', 'Create');
 }
 
 function _civicrm_api3_pdf_formatMessage($messageTemplates){

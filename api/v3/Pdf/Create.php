@@ -83,7 +83,6 @@ function civicrm_api3_pdf_create($params) {
     throw new API_Exception('Parameter contact_id must be a unique id or a list of ids separated by comma');
   }
   $contactIds = explode(",", $params['contact_id']);
-
   // Compatibility with CiviCRM > 4.3
   if($version >= 4.4) {
     $messageTemplates = new CRM_Core_DAO_MessageTemplate();
@@ -100,7 +99,12 @@ function civicrm_api3_pdf_create($params) {
     $messageTemplates->pdf_format_id = CRM_Utils_Array::value('pdf_format_id', $params, 0);
   }
   $html_template = _civicrm_api3_pdf_formatMessage($messageTemplates);
-
+  $imgRegex = '/<img.*>/';
+  preg_match($imgRegex, $html_template, $imgTags, PREG_OFFSET_CAPTURE);
+  // Temporarily delete all img tags and put them back later
+  if (count($imgTags) !== 0) {
+	  $html_template = preg_replace($imgRegex, '', $html_template);
+  }
   $tokens = CRM_Utils_Token::getTokens($html_template);
   // get replacement text for these tokens
   $returnProperties = array(
@@ -112,32 +116,14 @@ function civicrm_api3_pdf_create($params) {
       'on_hold' => 1,
       'display_name' => 1,
   );
-  if (isset($messageToken['contact'])) {
-    foreach ($messageToken['contact'] as $key => $value) {
+  if (isset($tokens['contact'])) {
+    foreach ($tokens['contact'] as $key => $value) {
       $returnProperties[$value] = 1;
     }
   }
 
-  $imgTags = array();
-  $imgRegex = '/<img([\w\W]+?)/>/';
-  $removeTags = array(
-      '@<head[^>]*?>.*?</head>@siu',
-      '@<script[^>]*?>.*?</script>@siu',
-      '@<body>@siu',
-      '@</body>@siu',
-      '@<html[^>]*?>@siu',
-      '@</html>@siu',
-      '@<!DOCTYPE[^>]*?>@siu',
-    );
-  $htmlElementsInstead = array('', '', '', '', '', '');
-  $html_template = preg_replace($htmlElementstoStrip, $htmlElementsInstead, $html_template);
-  // Also capure the offset of the img tags so that we can insert them later
-
   list($details) = CRM_Utils_Token::getTokenDetails($contactIds, $returnProperties, false, false, null, $tokens);
   // call token hook
-  $hookTokens = array();
-  CRM_Utils_Hook::tokens($hookTokens);
-  $categories = array_keys($hookTokens);
   foreach($contactIds as $contactId){
     $html_message = $html_template;
     $contact = $details[$contactId];
@@ -159,10 +145,25 @@ function civicrm_api3_pdf_create($params) {
       else
         continue;
     }
-    CRM_Utils_Token::replaceGreetingTokens($html_message, NULL, $contact['contact_id']);
-    $html_message = CRM_Utils_Token::replaceContactTokens($html_message, $contact, false, $tokens, false, true);
-    $html_message = CRM_Utils_Token::replaceHookTokens($html_message, $contact , $categories, true);
+    // Custom token replacement method, way faster because we fetch all the token
+    // values beforehand.
+    foreach($tokens as $type => $tokenValue) {
+        foreach($tokenValue as $var) {
+            $contactKey = null;
+            if ($type === 'contact') {
+                $contactKey = "$var";
+            }
+            else {
+                $contactKey = "$type.$var";
+            }
+            CRM_Utils_Token::token_replace($type, $var, $contact[$contactKey], $html_message);
+	    }
+    }
     // Add new page after every contact
+    // Put all img tags back in the string
+    foreach($imgTags as $imgTag) {
+        $html_message = substr_replace($html_message, $imgTag[0], $imgTag[1], 0);
+    }
     $html_message .= '<div style="page-break-after: always"></div>';
     $html .= $html_message;
   }
@@ -214,3 +215,4 @@ function _civicrm_api3_pdf_formatMessage($messageTemplates){
 
   return $html_message;
 }
+

@@ -113,13 +113,9 @@ function civicrm_api3_pdf_create($params) {
   $tokens = CRM_Utils_Token::getTokens($html_template);
   // get replacement text for these tokens
   $returnProperties = array(
-      'sort_name' => 1,
-      'email' => 1,
-      'address' => 1,
       'do_not_email' => 1,
       'is_deceased' => 1,
       'on_hold' => 1,
-      'display_name' => 1,
   );
   if (isset($tokens['contact'])) {
     foreach ($tokens['contact'] as $key => $value) {

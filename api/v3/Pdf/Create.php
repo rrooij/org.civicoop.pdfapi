@@ -12,7 +12,6 @@ ini_set('max_execution_time', 20000);
 function _civicrm_api3_pdf_create_spec(&$spec) {
   $spec['contact_id']['api.required'] = 1;
   $spec['template_id']['api.required'] = 1;
-  $spec['to_email']['api.required'] = 1;
 }
 
 function _civicrm_api3_pdf_generate_html(&$text, $pdfFormat = NULL ) {

@@ -14,6 +14,12 @@ function _civicrm_api3_pdf_create_spec(&$spec) {
   $spec['template_id']['api.required'] = 1;
 }
 
+/**
+ * Generate HTML needed for PDF
+ * @param string $text Text to render HTML
+ * @param int $pdfFormat PDF format ID for rendering the PDF
+ * @return string The generated HTML
+ */
 function _civicrm_api3_pdf_generate_html(&$text, $pdfFormat = NULL ) {
     // Get PDF Page Format
     $format = CRM_Core_BAO_PdfFormat::getDefaultValues();
@@ -170,6 +176,10 @@ function civicrm_api3_pdf_create($params) {
   return civicrm_api3_create_success(['html' => $finalHtml], $params, 'Pdf', 'Create');
 }
 
+/**
+ * Fix word wrapping and the like
+ * @TODO check if this is still needed
+ */
 function _civicrm_api3_pdf_formatMessage($messageTemplates){
   $html_message = $messageTemplates->msg_html;
 

@@ -103,7 +103,7 @@ function civicrm_api3_pdf_create($params) {
   if (isset($params['pdf_format_id'])) {
     $messageTemplates->pdf_format_id = CRM_Utils_Array::value('pdf_format_id', $params, 0);
   }
-  $html_template = _civicrm_api3_pdf_formatMessage($messageTemplates);
+  $html_template = $messageTemplates->msg_html;
   $imgRegex = '/<img.*>/';
   preg_match($imgRegex, $html_template, $imgTags, PREG_OFFSET_CAPTURE);
   // Temporarily delete all img tags and put them back later
@@ -175,53 +175,3 @@ function civicrm_api3_pdf_create($params) {
   $finalHtml = _civicrm_api3_pdf_generate_html($html, $messageTemplates->pdf_format_id);
   return civicrm_api3_create_success(['html' => $finalHtml], $params, 'Pdf', 'Create');
 }
-
-/**
- * Fix word wrapping and the like
- * @TODO check if this is still needed
- */
-function _civicrm_api3_pdf_formatMessage($messageTemplates){
-  $html_message = $messageTemplates->msg_html;
-
-  //time being hack to strip '&nbsp;'
-  //from particular letter line, CRM-6798
-  $newLineOperators = array(
-      'p' => array(
-          'oper' => '<p>',
-          'pattern' => '/<(\s+)?p(\s+)?>/m',
-      ),
-      'br' => array(
-          'oper' => '<br />',
-          'pattern' => '/<(\s+)?br(\s+)?\/>/m',
-      ),
-  );
-  $htmlMsg = preg_split($newLineOperators['p']['pattern'], $html_message);
-  foreach ($htmlMsg as $k => & $m) {
-    $messages = preg_split($newLineOperators['br']['pattern'], $m);
-    foreach ($messages as $key => & $msg) {
-      $msg = trim($msg);
-      $matches = array();
-      if (preg_match('/^(&nbsp;)+/', $msg, $matches)) {
-        $spaceLen = strlen($matches[0]) / 6;
-        $trimMsg = ltrim($msg, '&nbsp; ');
-        $charLen = strlen($trimMsg);
-        $totalLen = $charLen + $spaceLen;
-        if ($totalLen > 100) {
-          $spacesCount = 10;
-          if ($spaceLen > 50) {
-            $spacesCount = 20;
-          }
-          if ($charLen > 100) {
-            $spacesCount = 1;
-          }
-          $msg = str_repeat('&nbsp;', $spacesCount) . $trimMsg;
-        }
-      }
-    }
-    $m = implode($newLineOperators['br']['oper'], $messages);
-  }
-  $html_message = implode($newLineOperators['p']['oper'], $htmlMsg);
-
-  return $html_message;
-}
-

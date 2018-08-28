@@ -53,7 +53,7 @@ function _civicrm_api3_pdf_generate_html(&$text, $pdfFormat = NULL ) {
     // Add a special region for the HTML header of PDF files:
     $pdfHeaderRegion = CRM_Core_Region::instance('export-document-header', FALSE);
     $htmlHeader = ($pdfHeaderRegion) ? $pdfHeaderRegion->render('', FALSE) : '';
-    $html = "
+    return "
 <html>
   <head>
     <meta http-equiv=\"Content-Type\" content=\"text/html; charset=utf-8\"/>
@@ -62,13 +62,11 @@ function _civicrm_api3_pdf_generate_html(&$text, $pdfFormat = NULL ) {
     {$htmlHeader}
   </head>
   <body>
-    <div id=\"crm-container\">\n";
-    $html .= $text;
-    $html .= "
+    <div id=\"crm-container\">\n
+          {$text}
     </div>
   </body>
 </html>";
-    return $html;
 }
 
 /**

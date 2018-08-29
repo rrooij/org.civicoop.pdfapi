@@ -11,7 +11,8 @@ ini_set('max_execution_time', 20000);
  */
 function _civicrm_api3_pdf_create_spec(&$spec) {
   $spec['contact_id']['api.required'] = 1;
-  $spec['template_id']['api.required'] = 1;
+  $spec['pdf_format_id']['api.required'] = 1;
+  $spec['msg_html']['api.required'] = 1;
 }
 
 /**
@@ -79,29 +80,14 @@ function _civicrm_api3_pdf_generate_html(&$text, $pdfFormat = NULL ) {
  * @throws API_Exception
  */
 function civicrm_api3_pdf_create($params) {
-  $version = CRM_Core_BAO_Domain::version();
   $html    = '';
 
   if (!preg_match('/[0-9]+(,[0-9]+)*/i', $params['contact_id'])) {
     throw new API_Exception('Parameter contact_id must be a unique id or a list of ids separated by comma');
   }
   $contactIds = explode(",", $params['contact_id']);
-  // Compatibility with CiviCRM > 4.3
-  if($version >= 4.4) {
-    $messageTemplates = new CRM_Core_DAO_MessageTemplate();
-  } else {
-    $messageTemplates = new CRM_Core_DAO_MessageTemplates();
-  }
 
-  $messageTemplates->id = $params['template_id'];
-  if (!$messageTemplates->find(TRUE)) {
-    throw new API_Exception('Could not find template with ID: ' . $params['template_id']);
-  }
-  // Optional pdf_format_id, if not default 0
-  if (isset($params['pdf_format_id'])) {
-    $messageTemplates->pdf_format_id = CRM_Utils_Array::value('pdf_format_id', $params, 0);
-  }
-  $html_template = $messageTemplates->msg_html;
+  $html_template = $params['msg_html'];
   $imgRegex = '/<img.*>/';
   preg_match($imgRegex, $html_template, $imgTags, PREG_OFFSET_CAPTURE);
   // Temporarily delete all img tags and put them back later
@@ -166,6 +152,6 @@ function civicrm_api3_pdf_create($params) {
     $html_message .= '<div style="page-break-after: always"></div>';
     $html .= $html_message;
   }
-  $finalHtml = _civicrm_api3_pdf_generate_html($html, $messageTemplates->pdf_format_id);
+  $finalHtml = _civicrm_api3_pdf_generate_html($html, $params['pdf_format_id']);
   return civicrm_api3_create_success(['html' => $finalHtml], $params, 'Pdf', 'Create');
 }

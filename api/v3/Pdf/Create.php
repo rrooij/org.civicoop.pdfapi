@@ -80,8 +80,6 @@ function _civicrm_api3_pdf_generate_html(&$text, $pdfFormat = NULL ) {
  * @throws API_Exception
  */
 function civicrm_api3_pdf_create($params) {
-  $html    = '';
-
   if (!preg_match('/[0-9]+(,[0-9]+)*/i', $params['contact_id'])) {
     throw new API_Exception('Parameter contact_id must be a unique id or a list of ids separated by comma');
   }
@@ -106,7 +104,7 @@ function civicrm_api3_pdf_create($params) {
       $returnProperties[$value] = 1;
     }
   }
-
+  $html = [];
   list($details) = CRM_Utils_Token::getTokenDetails($contactIds, $returnProperties, false, false, null, $tokens);
   // call token hook
   foreach($contactIds as $contactId){
@@ -150,8 +148,9 @@ function civicrm_api3_pdf_create($params) {
         $html_message = substr_replace($html_message, $imgTag[0], $imgTag[1], 0);
     }
     $html_message .= '<div style="page-break-after: always"></div>';
-    $html .= $html_message;
+    $html[] = $html_message;
   }
+  $html = implode($html);
   $finalHtml = _civicrm_api3_pdf_generate_html($html, $params['pdf_format_id']);
   return civicrm_api3_create_success(['html' => $finalHtml], $params, 'Pdf', 'Create');
 }

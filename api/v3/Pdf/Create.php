@@ -97,9 +97,8 @@ function civicrm_api3_pdf_create($params) {
   $tokens = CRM_Utils_Token::getTokens($html_template);
   // get replacement text for these tokens
   $returnProperties = array(
-      'do_not_email' => 1,
+      'do_not_mail' => 1,
       'is_deceased' => 1,
-      'on_hold' => 1,
   );
   if (isset($tokens['contact'])) {
     foreach ($tokens['contact'] as $key => $value) {
@@ -121,12 +120,6 @@ function civicrm_api3_pdf_create($params) {
     if (isset($contact['is_deceased']) && $contact['is_deceased'] == TRUE) {
       if(count($contactIds) == 1)
         throw new API_Exception('Suppressed creating pdf letter for: '.$contact['display_name'].' because contact is deceased');
-      else
-        continue;
-    }
-    if (isset($contact['on_hold']) && $contact['on_hold'] == TRUE) {
-      if(count($contactIds) == 1)
-        throw new API_Exception('Suppressed creating pdf letter for: '.$contact['display_name'].' because contact is on hold');
       else
         continue;
     }
